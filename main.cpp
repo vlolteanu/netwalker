@@ -11,7 +11,8 @@ using namespace std;
 
 void usage()
 {
-	cout << "netwalker <width> <height> <puzzle>" << endl;
+	cerr << "netwalker <width> <height> <puzzle>" << endl;
+	exit(EXIT_FAILURE);
 }
 
 enum PieceType
@@ -319,46 +320,41 @@ void Table::solve(int maxDepth)
 again:
 	for (int depth = 1; depth <= maxDepth; depth++)
 	{
-		bool nothingToDo = true;
-		for (unsigned i = 0; i < height; i++)
+		for (auto coords : unsolvedCells)
 		{
-			for (unsigned j = 0; j < width; j++)
+			Cell &cell = cells[coords.first][coords.second];
+			if (cell.isSolved())
+				continue;
+
+			auto attemptToTamper = [&](Direction dir, bool close)
 			{
-				Cell &cell = cells[i][j];
-				if (cell.isSolved())
-					continue;
-
-				nothingToDo = false;
-
-				auto attemptToTamper = [&](Direction dir, bool close)
+				return attempt(depth, [&]()
 				{
-					return attempt(depth, [&]()
-					{
-						return cell.stakes[dir] > 0 && cell.stakes[dir] < cell.candidates.size();
-					},
-					[&](Table &t)
-					{
-						return t.forceBorder(i, j, dir, close);
-					},
-					[&]()
-					{
-						return forceBorder(i, j, dir, !close);
-					});
-				};
-
-				for (auto d : {D_W, D_S})
+					return cell.stakes[dir] > 0 && cell.stakes[dir] < cell.candidates.size();
+				},
+				[&](Table &t)
 				{
-					for (bool close : { true, false })
-					{
-						if (attemptToTamper(d, close))
-							goto again;
-					}
+					return t.forceBorder(coords.first, coords.second, dir, close);
+				},
+				[&]()
+				{
+					return forceBorder(coords.first, coords.second, dir, !close);
+				});
+			};
+
+			for (auto d : { D_W, D_S })
+			{
+				for (bool close : { true, false })
+				{
+					if (attemptToTamper(d, close))
+						goto again;
 				}
 			}
 		}
-		if (nothingToDo)
+		if (unsolvedCells.empty())
 			throw *this;
 	}
+
 }
 
 template<typename T, typename U, typename V>
